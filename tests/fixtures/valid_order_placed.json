@@ -1,0 +1,14 @@
+{
+  "event_id": "4b0f6f2e-5c1a-4d7b-9a51-2f3c8e0d1a77",
+  "event_type": "order_placed",
+  "event_timestamp": "2026-01-05T09:15:02.250Z",
+  "produced_at": "2026-01-05T09:15:03.100Z",
+  "user_id": "u_001234",
+  "session_id": "s_8f3a2b1c0d9e7f65",
+  "order_id": "o_0a1b2c3d4e5f6071",
+  "amount": "149.90",
+  "currency": "EUR",
+  "schema_version": 1,
+  "source": "streampulse-synthetic-generator",
+  "is_synthetic": true
+}

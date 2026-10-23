@@ -1,0 +1,136 @@
+name: streampulse
+
+x-app-environment: &app-environment
+  STREAMPULSE_BOOTSTRAP_SERVERS: redpanda:9092
+  STREAMPULSE_EVENTS_TOPIC: ${STREAMPULSE_EVENTS_TOPIC:-streampulse.ecommerce.events.v1}
+  STREAMPULSE_DLQ_TOPIC: ${STREAMPULSE_DLQ_TOPIC:-streampulse.ecommerce.events.dlq.v1}
+  STREAMPULSE_CONSUMER_GROUP: ${STREAMPULSE_CONSUMER_GROUP:-streampulse-clickhouse-writer}
+  STREAMPULSE_BATCH_SIZE: ${STREAMPULSE_BATCH_SIZE:-500}
+  STREAMPULSE_BATCH_TIMEOUT_SECONDS: ${STREAMPULSE_BATCH_TIMEOUT_SECONDS:-1.0}
+  STREAMPULSE_ALLOWED_LATENESS_SECONDS: ${STREAMPULSE_ALLOWED_LATENESS_SECONDS:-60}
+  STREAMPULSE_LOG_LEVEL: ${STREAMPULSE_LOG_LEVEL:-INFO}
+  STREAMPULSE_LOG_FORMAT: ${STREAMPULSE_LOG_FORMAT:-text}
+  CLICKHOUSE_HOST: clickhouse
+  CLICKHOUSE_PORT: "8123"
+  CLICKHOUSE_DATABASE: ${CLICKHOUSE_DATABASE:-streampulse}
+  CLICKHOUSE_USER: ${CLICKHOUSE_USER:-streampulse}
+  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD in .env (copy .env.example)}
+
+x-app-service: &app-service
+  build: .
+  image: streampulse-app:local
+  environment: *app-environment
+  profiles: ["app"]
+  restart: "no"
+
+services:
+  redpanda:
+    image: redpandadata/redpanda:${REDPANDA_VERSION:-v24.2.7}
+    command:
+      - redpanda
+      - start
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:${REDPANDA_KAFKA_HOST_PORT:-19092}
+      - --rpc-addr=redpanda:33145
+      - --advertise-rpc-addr=redpanda:33145
+      - --mode=dev-container
+      - --smp=1
+      - --memory=1G
+      - --default-log-level=warn
+    ports:
+      - "${REDPANDA_KAFKA_HOST_PORT:-19092}:19092"
+      - "${REDPANDA_ADMIN_HOST_PORT:-19644}:9644"
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+
+  topics-init:
+    image: redpandadata/redpanda:${REDPANDA_VERSION:-v24.2.7}
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-ec"]
+    environment:
+      EVENTS_TOPIC: ${STREAMPULSE_EVENTS_TOPIC:-streampulse.ecommerce.events.v1}
+      DLQ_TOPIC: ${STREAMPULSE_DLQ_TOPIC:-streampulse.ecommerce.events.dlq.v1}
+    command:
+      - |
+        export RPK_BROKERS=redpanda:9092
+        rpk topic describe "$$EVENTS_TOPIC" >/dev/null 2>&1 \
+          || rpk topic create "$$EVENTS_TOPIC" --partitions 3 --replicas 1 \
+               --topic-config retention.ms=604800000
+        rpk topic describe "$$DLQ_TOPIC" >/dev/null 2>&1 \
+          || rpk topic create "$$DLQ_TOPIC" --partitions 1 --replicas 1 \
+               --topic-config retention.ms=2592000000
+        rpk topic list
+    restart: "no"
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-24.8}
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DATABASE:-streampulse}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-streampulse}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD in .env (copy .env.example)}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "${CLICKHOUSE_HTTP_HOST_PORT:-8123}:8123"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 -O- http://127.0.0.1:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+
+  migrate:
+    <<: *app-service
+    entrypoint: ["python", "-m", "streampulse.storage.migrate"]
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
+  producer:
+    <<: *app-service
+    entrypoint: ["python", "-m", "streampulse.producer.main"]
+    depends_on:
+      topics-init:
+        condition: service_completed_successfully
+
+  consumer:
+    <<: *app-service
+    entrypoint: ["python", "-m", "streampulse.consumer.main"]
+    depends_on:
+      topics-init:
+        condition: service_completed_successfully
+      clickhouse:
+        condition: service_healthy
+
+  dashboard:
+    <<: *app-service
+    entrypoint:
+      - streamlit
+      - run
+      - dashboard/app.py
+      - --server.port=8501
+      - --server.address=0.0.0.0
+      - --server.headless=true
+      - --browser.gatherUsageStats=false
+    ports:
+      - "${DASHBOARD_HOST_PORT:-8501}:8501"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
+volumes:
+  redpanda-data:
+  clickhouse-data:

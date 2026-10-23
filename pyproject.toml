@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "streampulse"
+version = "0.1.0"
+description = "Production-inspired real-time e-commerce event pipeline: Redpanda, Python and ClickHouse."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = [
+    "confluent-kafka>=2.6,<3",
+    "clickhouse-connect>=0.8,<1",
+    "pydantic>=2.8,<3",
+]
+
+[project.optional-dependencies]
+dashboard = [
+    "streamlit>=1.38,<2",
+    "pandas>=2.2,<3",
+    "altair>=5.3,<6",
+]
+report = [
+    "matplotlib>=3.9,<4",
+]
+dev = [
+    "pytest>=8.3,<10",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+streampulse-generate = "streampulse.events.generator:main"
+streampulse-produce = "streampulse.producer.main:main"
+streampulse-consume = "streampulse.consumer.main:main"
+streampulse-migrate = "streampulse.storage.migrate:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+markers = [
+    "integration: requires running Redpanda and ClickHouse (set STREAMPULSE_RUN_INTEGRATION=1)",
+]
+filterwarnings = ["error::pytest.PytestUnraisableExceptionWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests", "scripts", "dashboard"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "T20", "RUF"]

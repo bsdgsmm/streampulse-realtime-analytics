@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 560" font-family="Helvetica, Arial, sans-serif" role="img" aria-label="StreamPulse streaming architecture">
+  <title>StreamPulse streaming architecture</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/>
+    </marker>
+    <style>
+      .box { fill: #ffffff; stroke: #334155; stroke-width: 1.5; }
+      .zone { fill: #f8fafc; stroke: #cbd5e1; stroke-width: 1; stroke-dasharray: 5 4; }
+      .title { font-size: 15px; font-weight: 700; fill: #0f172a; }
+      .text { font-size: 12px; fill: #334155; }
+      .small { font-size: 11px; fill: #64748b; }
+      .label { font-size: 11px; fill: #0f172a; }
+      .flow { stroke: #334155; stroke-width: 1.8; fill: none; marker-end: url(#arrow); }
+      .dlq { stroke: #dc2626; stroke-width: 1.8; fill: none; marker-end: url(#arrow-red); }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1100" height="560" fill="#ffffff"/>
+  <text x="30" y="36" class="title" font-size="20">StreamPulse - real-time event pipeline (local Docker Compose stack)</text>
+
+  <rect x="20" y="60" width="1060" height="470" rx="10" class="zone"/>
+  <text x="34" y="82" class="small">docker network "streampulse" - containers use redpanda:9092 and clickhouse:8123; the host uses localhost:19092 and localhost:8123</text>
+
+  <!-- Producer -->
+  <rect x="40" y="120" width="210" height="160" rx="8" class="box"/>
+  <text x="56" y="146" class="title">Producer</text>
+  <text x="56" y="170" class="text">Seeded synthetic generator</text>
+  <text x="56" y="188" class="text">6 e-commerce event types</text>
+  <text x="56" y="206" class="text">injects late, duplicate and</text>
+  <text x="56" y="224" class="text">invalid messages</text>
+  <text x="56" y="248" class="small">confluent-kafka, acks=all,</text>
+  <text x="56" y="264" class="small">idempotent, key = session_id</text>
+
+  <!-- Redpanda -->
+  <rect x="320" y="120" width="245" height="160" rx="8" class="box"/>
+  <text x="336" y="146" class="title">Redpanda (Kafka API)</text>
+  <text x="336" y="172" class="text" >streampulse.ecommerce.events.v1</text>
+  <text x="336" y="190" class="small">3 partitions, 7 day retention</text>
+  <text x="336" y="222" class="text" >streampulse.ecommerce.events.dlq.v1</text>
+  <text x="336" y="240" class="small">original payload + dlq.* error headers</text>
+  <text x="336" y="264" class="small">30 day retention</text>
+
+  <!-- Consumer -->
+  <rect x="610" y="100" width="230" height="250" rx="8" class="box"/>
+  <text x="626" y="126" class="title">Consumer</text>
+  <text x="626" y="150" class="text">1. decode JSON</text>
+  <text x="626" y="168" class="text">2. validate schema v1 (Pydantic)</text>
+  <text x="626" y="186" class="text">3. drop duplicates (event_id LRU)</text>
+  <text x="626" y="204" class="text">4. classify lateness (watermark</text>
+  <text x="644" y="220" class="text">per partition, 60 s allowed)</text>
+  <text x="626" y="238" class="text">5. DLQ rejected, wait for acks</text>
+  <text x="626" y="256" class="text">6. batch insert with dedup token</text>
+  <text x="644" y="274" class="text">bounded retry + backoff</text>
+  <text x="626" y="292" class="text">7. commit offsets (sync)</text>
+  <text x="626" y="318" class="small">manual commits after durable writes</text>
+  <text x="626" y="334" class="small">= at-least-once delivery</text>
+
+  <!-- ClickHouse -->
+  <rect x="900" y="100" width="165" height="250" rx="8" class="box"/>
+  <text x="916" y="126" class="title">ClickHouse</text>
+  <text x="916" y="152" class="text">events</text>
+  <text x="916" y="168" class="small">ReplacingMergeTree</text>
+  <text x="916" y="194" class="text">event_rejections</text>
+  <text x="916" y="210" class="small">ReplacingMergeTree</text>
+  <text x="916" y="236" class="text">consumer_batches</text>
+  <text x="916" y="252" class="small">MergeTree</text>
+  <text x="916" y="278" class="text">consumer_lag</text>
+  <text x="916" y="294" class="small">MergeTree</text>
+  <text x="916" y="324" class="small">queries read with FINAL</text>
+
+  <!-- Consumers of data -->
+  <rect x="610" y="410" width="230" height="90" rx="8" class="box"/>
+  <text x="626" y="436" class="title">Streamlit dashboard</text>
+  <text x="626" y="458" class="text">sql/analytics.sql named queries</text>
+  <text x="626" y="476" class="small">funnel, lateness, DLQ, lag, latency</text>
+
+  <rect x="900" y="410" width="165" height="90" rx="8" class="box"/>
+  <text x="916" y="436" class="title">Analysts / CLI</text>
+  <text x="916" y="458" class="text">run_analytics.py</text>
+  <text x="916" y="476" class="text">render_report.py</text>
+
+  <rect x="320" y="410" width="220" height="90" rx="8" class="box"/>
+  <text x="336" y="436" class="title">DLQ tooling</text>
+  <text x="336" y="458" class="text">dlq_tool.py inspect</text>
+  <text x="336" y="476" class="text">dlq_tool.py replay --execute</text>
+
+  <!-- Flows -->
+  <path d="M250,200 L318,200" class="flow"/>
+  <text x="256" y="190" class="label">JSON</text>
+
+  <path d="M565,175 L608,175" class="flow"/>
+  <text x="562" y="166" class="label">poll</text>
+
+  <path d="M608,245 L567,236" class="dlq"/>
+  <text x="562" y="262" class="label" fill="#dc2626">DLQ</text>
+
+  <path d="M840,225 L898,225" class="flow"/>
+  <text x="846" y="215" class="label">INSERT</text>
+
+  <path d="M982,350 L982,408" class="flow"/>
+  <path d="M898,330 L842,430" class="flow"/>
+
+  <path d="M430,280 L430,408" class="dlq"/>
+  <path d="M320,455 C 220,455 200,330 300,250" class="flow" stroke-dasharray="6 4"/>
+  <text x="196" y="372" class="small">replay after fix</text>
+</svg>
