@@ -1,7 +1,5 @@
 # StreamPulse — Real-Time Event Platform
 
-[![CI](https://github.com/bsdgsmm/streampulse-realtime-analytics/actions/workflows/ci.yml/badge.svg)](https://github.com/bsdgsmm/streampulse-realtime-analytics/actions/workflows/ci.yml)
-
 A production-inspired streaming data pipeline for a fictional e-commerce company.
 A Python producer publishes synthetic shopping events to **Redpanda** (Kafka API),
 a Python consumer validates, deduplicates and classifies them by event time, and
@@ -104,7 +102,7 @@ enforced in code; a registry is listed under future improvements).
 
 | Component | Version | Notes |
 |---|---|---|
-| Python | 3.12+ | CI runs 3.12 and 3.13; the code uses PEP 695 generics. |
+| Python | 3.12+ | The code uses PEP 695 generics. |
 | confluent-kafka | >=2.6,<3 | Provides wheels for Linux and macOS (x86-64, arm64). |
 | clickhouse-connect | >=0.8,<1 | HTTP interface (port 8123). |
 | pydantic | >=2.8,<3 | v2 API only. |
@@ -408,9 +406,6 @@ make up && make test-integration
   They cover insert-token deduplication, `FINAL` collapsing replays, running every
   analytics query, SQL-vs-Python funnel equality, and a full producer → Redpanda →
   consumer → ClickHouse run including restart and full replay with a new consumer group.
-* **CI** (`.github/workflows/ci.yml`) runs Ruff, unit tests on Python 3.12 and 3.13, then
-  starts the Compose stack on the runner and runs the integration tests and `make demo`.
-  No secrets are needed.
 
 ## 13. Visualizations
 
@@ -437,8 +432,8 @@ run in the environment where this repository was assembled (see
 |---|---|
 | `ruff check .` / `ruff format --check .` | Passed locally |
 | Unit tests (`tests/unit`, 156 tests) | Passed locally on Python 3.13 |
-| Integration tests (`tests/integration`, 6 tests) | Written, **not yet run**: no container registry access where the code was assembled. CI runs them on every push. |
-| `make demo`, dashboard screenshot | **Not yet run** for the same reason; CI executes `make demo`. |
+| Integration tests (`tests/integration`, 6 tests) | Written, **not yet run**: no container registry access where the code was assembled. |
+| `make demo`, dashboard screenshot | **Not yet run** for the same reason. |
 
 ## 14. Troubleshooting
 
@@ -469,7 +464,7 @@ run in the environment where this repository was assembled (see
 
 ## 16. Future improvements
 
-* Avro or Protobuf with a schema registry and compatibility checks in CI.
+* Avro or Protobuf with a schema registry and automated compatibility checks.
 * Transactional produce + consume for the DLQ path, and an outbox or two-phase approach if
   exactly-once into ClickHouse becomes a requirement.
 * ClickHouse materialized views for per-minute rollups instead of `FINAL` on raw events.
@@ -493,8 +488,7 @@ run in the environment where this repository was assembled (see
 * **Reliability engineering:** bounded retries with backoff and jitter, transient vs
   permanent error classification, graceful shutdown.
 * **Testing and delivery:** deterministic fixtures, fakes for infrastructure boundaries,
-  isolated integration tests, Docker Compose, Makefile workflow and CI that runs the real
-  stack.
+  isolated integration tests, Docker Compose and a Makefile workflow.
 
 ## License
 
